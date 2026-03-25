@@ -1,0 +1,56 @@
+- hosts: web
+  become: true
+
+  tasks:
+
+    - name: Atualizar cache do apt
+      apt:
+        update_cache: yes
+
+    - name: Instalar Docker
+      apt:
+        name: docker.io
+        state: present
+
+    - name: Garantir que Docker está rodando
+      service:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Criar usuario sistema_a
+      user:
+        name: sistema_a
+        create_home: yes
+        shell: /bin/bash
+
+    - name: Adicionar usuario sistema_a ao grupo docker
+      user:
+        name: sistema_a
+        groups: docker
+        append: yes
+
+    - name: Permitir sistema_a executar docker via sudo sem senha
+      lineinfile:
+        path: /etc/sudoers
+        line: "sistema_a ALL=(ALL) NOPASSWD: /usr/bin/docker"
+        validate: 'visudo -cf %s'
+
+    - name: Criar rede docker
+      command: docker network create bmt-rede-docker
+      ignore_errors: yes
+
+    - name: Subir container postgres
+      docker_container:
+        name: postgres
+        image: postgres:16
+        state: started
+        restart_policy: always
+        networks:
+          - name: bmt-rede-docker
+        env:
+          POSTGRES_DB: postgres-dev
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: sacadura10
+        ports:
+          - "5432:5432"
